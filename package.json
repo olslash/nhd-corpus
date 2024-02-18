@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "start": "ts-node -T index.ts"
+  },
+  "dependencies": {
+    "dockerode": "^4.0.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "devDependencies": {
+    "@types/dockerode": "^3.3.23",
+    "@types/node": "^20.11.19"
+  }
+}
