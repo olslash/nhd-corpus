@@ -1,5 +1,11 @@
 import Docker from "dockerode";
 
+const ignoreWords = ["しています", "お", "な", "や", "が", "の", "は", "を"];
+
+interface Alternative {
+  text: string;
+}
+
 type Conjugation = [
   | {
       reading: string;
@@ -7,9 +13,10 @@ type Conjugation = [
     }
   | undefined
 ];
-type Word = [eng: string, { text: string; conj?: Conjugation, alternative?: [{
-    text: string
-}] }];
+type Word = [
+  eng: string,
+  { text: string; conj?: Conjugation; alternative?: [Alternative] }
+];
 type IchiranResultType = (string | [[Word[]]])[];
 
 var docker = new Docker({
@@ -23,6 +30,28 @@ function streamToString(stream) {
     stream.on("error", (err) => reject(err));
     stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
   });
+}
+
+function getWords(input: IchiranResultType): string[] {
+  const result: string[] = [];
+
+  input.forEach((r) => {
+    if (Array.isArray(r)) {
+      const words = r[0][0];
+
+      words.forEach((word) => {
+        const reading = word[1].conj?.[0]?.reading;
+        const dictForm = reading?.slice(0, reading.indexOf("【"));
+
+        const wordResult =
+          dictForm || word[1].text || word[1]?.alternative?.[0].text;
+
+        wordResult && result.push(wordResult);
+      });
+    }
+  });
+
+  return result;
 }
 
 /**
@@ -50,22 +79,10 @@ function runExec(container) {
           s.slice(8) //?????
         ) as IchiranResultType;
 
-        result.forEach((r) => {
-          if (Array.isArray(r)) {
-            const words = r[0][0];
-
-            words.forEach((word) => {
-              const reading = word[1].conj?.[0]?.reading;
-              const dictForm = reading?.slice(0, reading.indexOf("【"));
-
-              console.log(dictForm || word[1].text);
-
-              if (!dictForm && !word[1].text) {
-                console.log(word[1]?.alternative[0].text);
-              }
-            });
-          }
-        });
+        const words = getWords(result).filter(
+          (word) => !ignoreWords.includes(word)
+        );
+        console.log(words);
       });
     });
   });
