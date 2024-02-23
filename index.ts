@@ -1,4 +1,6 @@
 import Docker from "dockerode";
+import fs from "fs";
+import path from "path";
 
 const ignoreWords = ["しています", "お", "な", "や", "が", "の", "は", "を"];
 
@@ -59,6 +61,17 @@ function getWords(input: IchiranResultType): string[] {
  * @param container
  */
 function runExec(container) {
+  const transcriptsPath = path.resolve(
+    "./nihongothatsdan-transcripts/transcripts/"
+  );
+  const allTranscripts = fs
+    .readdirSync(transcriptsPath)
+    .map((path) =>
+      fs.readFileSync(`${transcriptsPath}/${path}`).toString("utf8")
+    );
+
+  console.log(allTranscripts[3]);
+
   var options = {
     Cmd: [
       "ichiran-cli",
