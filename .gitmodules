@@ -1,0 +1,3 @@
+[submodule "nihongothatsdan-transcripts"]
+	path = nihongothatsdan-transcripts
+	url = git@github.com:olslash/nihongothatsdan-transcripts.git
