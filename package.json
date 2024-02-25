@@ -3,6 +3,7 @@
     "start": "ts-node -T index.ts"
   },
   "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
     "dockerode": "^4.0.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"

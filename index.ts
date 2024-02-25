@@ -1,6 +1,7 @@
 import Docker from "dockerode";
 import fs from "fs";
 import path from "path";
+import { load } from "cheerio";
 
 const ignoreWords = ["しています", "お", "な", "や", "が", "の", "は", "を"];
 
@@ -56,11 +57,30 @@ function getWords(input: IchiranResultType): string[] {
   return result;
 }
 
+function getLines(html: string): string[] {
+  const $ = load(html);
+
+  const table = $("tbody");
+
+  // newer <table> based
+  if (table.length) {
+    return table
+      .children()
+      .toArray()
+      .map((el) => load(el).text());
+  } else {
+    // older <p> based
+    return $("p")
+      .toArray()
+      .map((el) => load(el).text());
+  }
+}
+
 /**
  * Get env list from running container
  * @param container
  */
-function runExec(container) {
+function runExec(container: Docker.Container) {
   const transcriptsPath = path.resolve(
     "./nihongothatsdan-transcripts/transcripts/"
   );
@@ -70,34 +90,59 @@ function runExec(container) {
       fs.readFileSync(`${transcriptsPath}/${path}`).toString("utf8")
     );
 
-  console.log(allTranscripts[3]);
+  let failures = 0;
 
-  var options = {
-    Cmd: [
-      "ichiran-cli",
-      "-f",
-      "このチャンネルは仲良し夫婦のたつやとちよしが、日々の何気ない会話、雑談を通して自然な日常日本語会話をお伝えしています",
-    ],
-    AttachStdout: true,
-    AttachStderr: true,
-  };
+  Promise.all(
+    allTranscripts.slice(allTranscripts.length - 10).map((transcHTML) => {
+      return Promise.all(
+        getLines(transcHTML).map((line) => {
+          var options = {
+            Cmd: ["ichiran-cli", "-f", line],
+            AttachStdout: true,
+            AttachStderr: true,
+          };
 
-  container.exec(options, function (err, exec) {
-    if (err) return;
-    exec.start(function (err, stream) {
-      if (err) return;
+          return container.exec(options).then((exec) => {
+            if (!exec) return;
 
-      const s = streamToString(stream).then((s) => {
-        const result = JSON.parse(
-          s.slice(8) //?????
-        ) as IchiranResultType;
+            return exec.start().then((stream) => {
+              return streamToString(stream).then((s) => {
+                try {
+                  const result = JSON.parse(
+                    s.slice(8) //?????
+                  ) as IchiranResultType;
 
-        const words = getWords(result).filter(
-          (word) => !ignoreWords.includes(word)
-        );
-        console.log(words);
-      });
-    });
+                  return getWords(result).filter(
+                    (word) => !ignoreWords.includes(word)
+                  );
+                } catch (e) {
+                  // lol invalid json good tool
+                  failures++;
+                }
+              });
+            });
+          });
+        })
+      );
+    })
+  ).then((transcripts) => {
+    console.log("done extracting vocab with", failures, "failures");
+    const allVocab: { [word: string]: number } = {};
+
+    for (const transcript of transcripts) {
+      if (!transcript) return;
+
+      for (const line of transcript) {
+        if (!line) return;
+
+        for (const word of line) {
+          allVocab[word] = (allVocab[word] || 0) + 1;
+        }
+      }
+    }
+
+    console.log("done")
+    console.log(allVocab);
   });
 }
 
